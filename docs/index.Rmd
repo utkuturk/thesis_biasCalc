@@ -1,0 +1,369 @@
+---
+title: "Bias Calculations of the Thesis Experiments"
+author: "Utku Turk"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::html_docco:
+    highlight: kate
+    fig_height: 7
+    fig_weight: 6
+---
+
+```{r setup, echo=TRUE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+library(fst) # for reading data files
+library(magrittr) # for pipes
+library(dplyr)
+library(ggplot2)
+library(formatR)
+theme_set(theme_bw())
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+```{r readData}
+data_ungrammaticalityBias <- read_fst("exp1_ungrammatical_bias.fst")
+data_grammaticalityBias <- read_fst("exp2_grammatical_bias.fst")
+```
+
+```{r prepareData}
+##  for filler analysis
+data_ungrammaticalityBias_nonna_nofillers <- 
+  data_ungrammaticalityBias %>% 
+    subset(!is.na(response_yes) & experiment == "filler")
+
+data_grammaticalityBias_nonna_nofillers <- 
+  data_grammaticalityBias %>% 
+    subset(!is.na(response_yes) & experiment == "filler")
+
+
+##  for "whole" analysis
+data_ungrammaticalityBias_nonna <- 
+  data_ungrammaticalityBias %>% 
+    subset(!is.na(response_yes))
+
+data_grammaticalityBias_nonna <- 
+  data_grammaticalityBias %>% 
+    subset(!is.na(response_yes))
+```
+
+<center> 
+
+## Formula Used
+
+$c = - \frac{Z(Hit\ Rate)\ +\ Z(False\ Alarm\ Rate)}{2}$ 
+
+Negative c implies bias towards grammatical responses
+
+Positive c implies bias towards ungrammatical responses
+
+Maybe I should add bayesian t-test results?
+
+</center>
+
+## Filler Only Bias Calculation
+
+```{r prepareVariablesANDcalculateBiasforUNGFILLERS}
+##  Fillers - Ung Bias
+###  hit rates
+hitRates_ung_fillers <-
+data_ungrammaticalityBias_nonna_nofillers %>% 
+  group_by(subject) %>% 
+    filter(exp_condition == "filler_g") %>% 
+      summarize(
+        hitRate =  mean(ResponseCorrect),
+      ) 
+
+###  false alarms
+falseAlarms_ung_fillers <-
+data_ungrammaticalityBias_nonna_nofillers %>% 
+  group_by(subject) %>% 
+    filter(exp_condition == "filler_ung") %>% 
+      summarize(
+        falseAlarm =  mean(response_yes),
+      ) 
+
+
+###  start working on zscore dataframe
+zscores_ung_fillers <- 
+  full_join(hitRates_ung_fillers, 
+            falseAlarms_ung_fillers, 
+            by = "subject")
+
+### zscore calculation
+zscores_ung_fillers <- 
+  zscores_ung_fillers %>% 
+            mutate(
+              zscore_hitRates = (hitRate - mean(hitRate))/sd(hitRate),
+              zscore_falseAlarms = (falseAlarm - mean(falseAlarm))/sd(falseAlarm)
+            )
+
+### bias calculation
+biases_ung_fillers <- 
+  zscores_ung_fillers %>% 
+    mutate(
+      bias = -1 * ( ( zscore_hitRates + zscore_falseAlarms ) / 2 )
+    )
+
+```
+
+```{r plot1}
+
+
+biases_ung_fillers %>% ggplot(aes(bias, subject)) + 
+  geom_point() +
+  xlab("c (bias) value") +
+  ylab("Subject ID") + 
+  ggtitle("By Participant Bias Values\n using Fillers for Ungrammatical Bias Exp") +
+  theme_bw()
+
+```
+
+```{r prepareVariablesANDcalculateBiasforGFILLERS}
+##  Fillers - Gram Bias
+###  hit rates
+hitRates_g_fillers <-
+  data_grammaticalityBias_nonna_nofillers %>% 
+  group_by(subject) %>% 
+  filter(exp_condition == "filler_g") %>% 
+  summarize(
+    hitRate =  mean(ResponseCorrect),
+  )
+
+### false alarms
+falseAlarms_g_fillers <-
+  data_grammaticalityBias_nonna_nofillers %>% 
+  group_by(subject) %>% 
+  filter(exp_condition == "filler_ung") %>% 
+  summarize(
+    falseAlarm =  mean(response_yes),
+  ) 
+
+###  start working on zscore dataframe
+zscores_g_fillers <- 
+  full_join(hitRates_g_fillers, 
+            falseAlarms_g_fillers, 
+            by = "subject")
+
+### zscore calculation
+zscores_g_fillers <- 
+  zscores_g_fillers %>% 
+    mutate(
+      zscore_hitRates = (hitRate - mean(hitRate))/sd(hitRate),
+      zscore_falseAlarms = (falseAlarm - mean(falseAlarm))/sd(falseAlarm)
+    )
+
+### bias calculation
+biases_g_fillers <- 
+  zscores_g_fillers %>% 
+    mutate(
+      bias = -1 * ((zscore_hitRates + zscore_falseAlarms)/2)
+    )
+
+```
+
+```{r plot2}
+### plot
+biases_g_fillers %>% ggplot(aes(bias, subject)) + 
+  geom_point() +
+  xlab("c (bias) value") +
+  ylab("Subject ID") + 
+  ggtitle("By Participant Bias Values\n using Fillers for Grammatical Bias Exp") +
+  theme_bw()
+```
+
+```{r ExpWidePrepandPlot}
+## Exp-wide data
+
+### prepare means and CI
+ungBias_fillers_ExpBias <- 
+  biases_ung_fillers %>%  
+    summarize(p_bias = mean(bias), 
+            N = length(subject),
+            CI = 1.96*(sd(bias)/sqrt(length(bias)))) 
+
+ungBias_fillers_ExpBias$exp <- "ungBias"
+
+gBias_fillers_ExpBias <- 
+  biases_g_fillers %>%  
+    summarize(p_bias = mean(bias), 
+              N = length(subject),
+              CI = 1.96*(sd(bias)/sqrt(length(bias)))) 
+
+gBias_fillers_ExpBias$exp <- "gBias"
+
+### binding
+filler_biases <-
+  rbind(gBias_fillers_ExpBias, 
+        ungBias_fillers_ExpBias)
+
+```
+
+
+```{r plot3}
+### plot
+filler_biases %>% 
+  ggplot(aes(exp, p_bias)) + 
+  geom_point() + 
+  geom_errorbar(aes(ymin = p_bias-CI, 
+                    ymax = p_bias+CI)) +
+  xlab("") +
+  scale_x_discrete(
+    labels = c("Grammatical Bias",
+               "Ungrammatical Bias")
+  ) +
+  ylab("Mean c Value") + 
+  ggtitle("Mean Bias and 95% CIs\n using filler items") +
+  theme_bw()
+```
+
+## Whole Experiment Bias Calculation
+
+```{r UNGwholeBias}
+##  Whole - Ung Bias
+
+hitRates_ung_whole <-
+  data_ungrammaticalityBias_nonna %>% 
+  group_by(subject) %>% 
+  filter(grammatical == "gram") %>% 
+  summarize(
+    hitRate =  mean(ResponseCorrect),
+  ) 
+
+falseAlarms_ung_whole <-
+  data_ungrammaticalityBias_nonna %>% 
+  group_by(subject) %>% 
+  filter(grammatical == "ungram") %>% 
+  summarize(
+    falseAlarm =  mean(response_yes),
+  )
+
+zscores_ung_whole <- 
+  full_join(hitRates_ung_whole, 
+            falseAlarms_ung_whole, by = "subject")
+
+zscores_ung_whole <- zscores_ung_whole %>% 
+  mutate(
+    zscore_hitRates = (hitRate - mean(hitRate))/sd(hitRate),
+    zscore_falseAlarms = (falseAlarm - mean(falseAlarm))/sd(falseAlarm)
+  )
+
+biases_ung_whole <- zscores_ung_whole %>% 
+  mutate(
+    bias = -1 * ((zscore_hitRates + zscore_falseAlarms)/2)
+  )
+
+```
+
+```{r plot4}
+biases_ung_whole %>% ggplot(aes(bias, subject)) + 
+  geom_point()+
+  xlab("c (bias) value") +
+  ylab("Subject ID") + 
+  ggtitle("By Participant Bias Values\n using All items for Ungrammatical Bias Exp") +
+  theme_bw()
+
+```
+
+
+```{r GwholeBias}
+hitRates_g_whole <-
+  data_grammaticalityBias_nonna %>% 
+  group_by(subject) %>% 
+  filter(grammatical == "gram") %>% 
+  summarize(
+    hitRate =  mean(ResponseCorrect),
+  ) 
+
+falseAlarms_g_whole <-
+  data_grammaticalityBias_nonna %>% 
+  group_by(subject) %>% 
+  filter(grammatical == "ungram") %>% 
+  summarize(
+    falseAlarm =  mean(response_yes),
+  ) 
+
+zscores_g_whole <- 
+  full_join(hitRates_g_whole, 
+            falseAlarms_g_whole, by = "subject")
+
+zscores_g_whole <- zscores_g_whole %>% 
+  mutate(
+    zscore_hitRates = (hitRate - mean(hitRate))/sd(hitRate),
+    zscore_falseAlarms = (falseAlarm - mean(falseAlarm))/sd(falseAlarm)
+  )
+
+biases_g_whole <- zscores_g_whole %>% 
+  mutate(
+    bias = -1 * ((zscore_hitRates + zscore_falseAlarms)/2)
+  )
+
+
+```
+
+
+```{r plot5}
+biases_g_whole %>% ggplot(aes(bias, subject)) + 
+  geom_point() + geom_line()+
+  xlab("c (bias) value") +
+  ylab("Subject ID") + 
+  ggtitle("By Participant Bias Values\n using All items for Grammatical Bias Exp") +
+  theme_bw()
+
+```
+
+
+
+```{r wideWholeBias}
+ungBias_whole_ExpBias <- 
+  biases_ung_whole %>%  
+  summarize(p_bias = mean(bias), 
+            N = length(subject),
+            CI = 1.96*(sd(bias)/sqrt(length(bias)))) 
+
+ungBias_whole_ExpBias$exp <- "ungBias"
+
+gBias_whole_ExpBias <- 
+  biases_g_whole %>%  
+  summarize(p_bias = mean(bias), 
+            N = length(subject),
+            CI = 1.96*(sd(bias)/sqrt(length(bias)))) 
+
+gBias_whole_ExpBias$exp <- "gBias"
+
+whole_biases <-
+  rbind(gBias_whole_ExpBias, ungBias_whole_ExpBias)
+
+
+
+```
+
+
+
+```{r plot7}
+
+whole_biases %>% 
+  ggplot(aes(exp, p_bias)) + 
+  geom_point() + 
+  geom_errorbar(aes(ymin = p_bias-CI, 
+                    ymax = p_bias+CI)) +
+  xlab("") +
+  scale_x_discrete(
+    labels = c("Grammatical Bias",
+               "Ungrammatical Bias")
+  ) +
+  ylab("Mean c Value") + 
+  ggtitle("Mean Bias and 95% CIs\n using all items") +
+  theme_bw()
+
+```

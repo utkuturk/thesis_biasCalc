@@ -1,0 +1,8 @@
+base
+knitr
+rmdformats
+fst
+magrittr
+dplyr
+ggplot2
+formatR
