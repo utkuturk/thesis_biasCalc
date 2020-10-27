@@ -3,7 +3,7 @@ title: "Bias Calculations of the Thesis Experiments"
 author: "Utku Turk"
 date: "`r Sys.Date()`"
 output:
-  rmdformats::material:
+  rmdformats::html_clean:
   highlight: kate
 fig_height: 7
 fig_weight: 6
