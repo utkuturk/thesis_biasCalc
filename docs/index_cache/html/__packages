@@ -4,5 +4,10 @@ rmdformats
 fst
 magrittr
 dplyr
+Rcpp
+brms
 ggplot2
 formatR
+patchwork
+usethis
+devtools

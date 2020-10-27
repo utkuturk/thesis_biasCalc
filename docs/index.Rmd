@@ -91,8 +91,6 @@ df <- full_join(data_grammaticalityBias_nonna_fillers, data_ungrammaticalityBias
 ```
 
 
-# Bias Calculation
-
   
 # Formula Used
   
@@ -154,13 +152,13 @@ biases <-
 
 ## By Participant Bias 
 
-```{r plot_byPart_Bias, options}
+```{r plot_byPart_Bias, fig.height=12, fig.width=15}
 biases %>% ggplot(aes(bias, subject)) + 
   geom_point() +
   xlab("c (bias) value") +
   ylab("Subject ID") + 
   ggtitle("By Participant Bias Values\n using Fillers for Ungrammatical Bias Exp") +
-  theme_bw()
+  theme_bw() | ggplot(data=biases, aes(bias)) + geom_histogram()
 ```
 
   
