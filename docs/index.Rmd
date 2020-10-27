@@ -3,26 +3,56 @@ title: "Bias Calculations of the Thesis Experiments"
 author: "Utku Turk"
 date: "`r Sys.Date()`"
 output:
-  rmdformats::html_docco:
-    highlight: kate
-    fig_height: 7
-    fig_weight: 6
+  rmdformats::material:
+  highlight: kate
+fig_height: 7
+fig_weight: 6
 ---
+  
+```{r setup, echo=FALSE, cache=FALSE, message = FALSE}
 
-```{r setup, echo=TRUE, cache=FALSE}
-library(knitr)
-library(rmdformats)
-library(fst) # for reading data files
-library(magrittr) # for pipes
-library(dplyr)
-library(ggplot2)
-library(formatR)
+#############################################
+############### DO NOT KNIT #################
+############### IMMEDIATELY #################
+#############################################
+############## CHECK PACKAGES ###############
+################## AND ######################
+############### INSTALL THEM ################
+####### BY USING THE FUNCTION BELOW #########
+
+
+## WRITE CRAN PACKAGES HERE
+packages = c("knitr", 
+             "rmdformats",
+             "fst", 
+             "magrittr", 
+             "dplyr", 
+             "brms", 
+             "ggplot2",
+             "formatR", 
+             "patchwork", 
+             "devtools",
+             "rmdformats")
+
+## Now load or install&load all
+package.check <- lapply(
+  packages,
+  FUN = function(x) {
+    if (!require(x, character.only = TRUE)) {
+      install.packages(x, dependencies = TRUE)
+      library(x, character.only = TRUE)
+    }
+  }
+)
+# This will fail real hard when we have packages from github
+
+
 theme_set(theme_bw())
-
+source("../scripts/misc.R")
 ## Global options
 options(max.print="75")
-opts_chunk$set(echo=TRUE,
-	             cache=TRUE,
+opts_chunk$set(echo=FALSE,
+               cache=TRUE,
                prompt=FALSE,
                tidy=TRUE,
                comment=NA,
@@ -34,336 +64,312 @@ opts_knit$set(width=75)
 ```{r readData}
 data_ungrammaticalityBias <- read_fst("exp1_ungrammatical_bias.fst")
 data_grammaticalityBias <- read_fst("exp2_grammatical_bias.fst")
+data_ungrammaticalityBias$subject <- 
+  paste0(data_ungrammaticalityBias$subject, 
+         "_",
+         data_ungrammaticalityBias$exp_bias)
+data_grammaticalityBias$subject <- 
+  paste0(data_grammaticalityBias$subject, 
+         "_",
+         data_grammaticalityBias$exp_bias)
+df_all <- full_join(data_ungrammaticalityBias, data_grammaticalityBias)
 ```
 
 ```{r prepareData}
 ##  for filler analysis
-data_ungrammaticalityBias_nonna_nofillers <- 
+data_ungrammaticalityBias_nonna_fillers <- 
   data_ungrammaticalityBias %>% 
-    subset(!is.na(response_yes) & experiment == "filler")
+  subset(!is.na(response_yes) & experiment == "filler")
 
-data_grammaticalityBias_nonna_nofillers <- 
+data_grammaticalityBias_nonna_fillers <- 
   data_grammaticalityBias %>% 
-    subset(!is.na(response_yes) & experiment == "filler")
+  subset(!is.na(response_yes) & experiment == "filler")
 
 
-##  for "whole" analysis
-data_ungrammaticalityBias_nonna <- 
-  data_ungrammaticalityBias %>% 
-    subset(!is.na(response_yes))
+df <- full_join(data_grammaticalityBias_nonna_fillers, data_ungrammaticalityBias_nonna_fillers)
 
-data_grammaticalityBias_nonna <- 
-  data_grammaticalityBias %>% 
-    subset(!is.na(response_yes))
 ```
 
-<center> 
 
-## Formula Used
+# Bias Calculation
 
-$c = - \frac{Z(Hit\ Rate)\ +\ Z(False\ Alarm\ Rate)}{2}$ 
-
+  
+# Formula Used
+  
+$c = - \frac{Z(Hit\ Rate)\ +\ Z(False\ Alarm\ Rate)}{2}$
+  
 Negative c implies bias towards grammatical responses
 
 Positive c implies bias towards ungrammatical responses
 
 Maybe I should add bayesian t-test results?
+  
 
-</center>
-
-## Filler Only Bias Calculation
-
+  
+# Filler Only Bias Calculation
+  
 ```{r prepareVariablesANDcalculateBiasforUNGFILLERS}
 ##  Fillers - Ung Bias
 ###  hit rates
-hitRates_ung_fillers <-
-data_ungrammaticalityBias_nonna_nofillers %>% 
-  group_by(subject) %>% 
-    filter(exp_condition == "filler_g") %>% 
-      summarize(
-        hitRate =  mean(ResponseCorrect),
-      ) 
-
-###  false alarms
-falseAlarms_ung_fillers <-
-data_ungrammaticalityBias_nonna_nofillers %>% 
-  group_by(subject) %>% 
-    filter(exp_condition == "filler_ung") %>% 
-      summarize(
-        falseAlarm =  mean(response_yes),
-      ) 
-
-
-###  start working on zscore dataframe
-zscores_ung_fillers <- 
-  full_join(hitRates_ung_fillers, 
-            falseAlarms_ung_fillers, 
-            by = "subject")
-
-### zscore calculation
-zscores_ung_fillers <- 
-  zscores_ung_fillers %>% 
-            mutate(
-              zscore_hitRates = (hitRate - mean(hitRate))/sd(hitRate),
-              zscore_falseAlarms = (falseAlarm - mean(falseAlarm))/sd(falseAlarm)
-            )
-
-### bias calculation
-biases_ung_fillers <- 
-  zscores_ung_fillers %>% 
-    mutate(
-      bias = -1 * ( ( zscore_hitRates + zscore_falseAlarms ) / 2 )
-    )
-
-```
-
-```{r plot1}
-
-
-biases_ung_fillers %>% ggplot(aes(bias, subject)) + 
-  geom_point() +
-  xlab("c (bias) value") +
-  ylab("Subject ID") + 
-  ggtitle("By Participant Bias Values\n using Fillers for Ungrammatical Bias Exp") +
-  theme_bw()
-
-```
-
-```{r prepareVariablesANDcalculateBiasforGFILLERS}
-##  Fillers - Gram Bias
-###  hit rates
-hitRates_g_fillers <-
-  data_grammaticalityBias_nonna_nofillers %>% 
+hitRates <-
+  df %>% 
   group_by(subject) %>% 
   filter(exp_condition == "filler_g") %>% 
   summarize(
     hitRate =  mean(ResponseCorrect),
-  )
+  ) 
 
-### false alarms
-falseAlarms_g_fillers <-
-  data_grammaticalityBias_nonna_nofillers %>% 
+###  false alarms
+falseAlarms <-
+  df %>% 
   group_by(subject) %>% 
   filter(exp_condition == "filler_ung") %>% 
   summarize(
     falseAlarm =  mean(response_yes),
   ) 
 
+
 ###  start working on zscore dataframe
-zscores_g_fillers <- 
-  full_join(hitRates_g_fillers, 
-            falseAlarms_g_fillers, 
+zscores <- 
+  full_join(hitRates, 
+            falseAlarms, 
             by = "subject")
 
 ### zscore calculation
-zscores_g_fillers <- 
-  zscores_g_fillers %>% 
-    mutate(
-      zscore_hitRates = (hitRate - mean(hitRate))/sd(hitRate),
-      zscore_falseAlarms = (falseAlarm - mean(falseAlarm))/sd(falseAlarm)
-    )
+zscores <- 
+  zscores %>% 
+  mutate(
+    zscore_hitRates = (hitRate - mean(hitRate))/sd(hitRate),
+    zscore_falseAlarms = (falseAlarm - mean(falseAlarm))/sd(falseAlarm)
+  )
 
 ### bias calculation
-biases_g_fillers <- 
-  zscores_g_fillers %>% 
-    mutate(
-      bias = -1 * ((zscore_hitRates + zscore_falseAlarms)/2)
-    )
+biases <- 
+  zscores %>% 
+  mutate(
+    bias = -1 * ( ( zscore_hitRates + zscore_falseAlarms ) / 2 )
+  )
 
 ```
 
-```{r plot2}
-### plot
-biases_g_fillers %>% ggplot(aes(bias, subject)) + 
+## By Participant Bias 
+
+```{r plot_byPart_Bias, options}
+biases %>% ggplot(aes(bias, subject)) + 
   geom_point() +
   xlab("c (bias) value") +
   ylab("Subject ID") + 
-  ggtitle("By Participant Bias Values\n using Fillers for Grammatical Bias Exp") +
+  ggtitle("By Participant Bias Values\n using Fillers for Ungrammatical Bias Exp") +
   theme_bw()
 ```
 
-```{r ExpWidePrepandPlot}
-## Exp-wide data
+  
+-   Participants with `_ungrammatical` were told "Most of the items are UNGRAMMATICAL."
+-   Participants with `_grammatical` were told "Most of the items are GRAMMATICAL."
+-   Previous results showed that this manipulation did not was not successful and as can be seen from this graph, they are mostly centered around 0. 
+-   Seems like on average participants were mostly unbiased.
 
-### prepare means and CI
-ungBias_fillers_ExpBias <- 
-  biases_ung_fillers %>%  
-    summarize(p_bias = mean(bias), 
-            N = length(subject),
-            CI = 1.96*(sd(bias)/sqrt(length(bias)))) 
+\noindent **Question:** Even though I failed to introduce any bias, Participants that are grouped according to their bias value should reflect the predictions nevertheless.
 
-ungBias_fillers_ExpBias$exp <- "ungBias"
-
-gBias_fillers_ExpBias <- 
-  biases_g_fillers %>%  
-    summarize(p_bias = mean(bias), 
-              N = length(subject),
-              CI = 1.96*(sd(bias)/sqrt(length(bias)))) 
-
-gBias_fillers_ExpBias$exp <- "gBias"
-
-### binding
-filler_biases <-
-  rbind(gBias_fillers_ExpBias, 
-        ungBias_fillers_ExpBias)
-
-```
+-   So, I cut the participants into two groups.
+-   Participants (N= `r sum(biases$bias > 0)`) who had above-zero value of c are biased towards ungrammatical answers.
+-   Participants (N= `r sum(biases$bias < 0)`) who had below-zero value of c are biased towards grammatical answers.
 
 
-```{r plot3}
-### plot
-filler_biases %>% 
-  ggplot(aes(exp, p_bias)) + 
-  geom_point() + 
-  geom_errorbar(aes(ymin = p_bias-CI, 
-                    ymax = p_bias+CI)) +
-  xlab("") +
-  scale_x_discrete(
-    labels = c("Grammatical Bias",
-               "Ungrammatical Bias")
-  ) +
-  ylab("Mean c Value") + 
-  ggtitle("Mean Bias and 95% CIs\n using filler items") +
-  theme_bw()
-```
+  
+  
+# Re-look at the Ungrammaticality Assymetry
+  
+  
+-   Obviously, I failed to introduce any bias in any of the experiments. 
+-   Two questions to ask:
+    
+    -   There is a clear difference between two experiments. Is this difference only about sampling?
+    -   Even though introducing a bias failed, there are still people who were biased (either towards grammatical or ungrammatical) regardless of our experiment.
 
-## Whole Experiment Bias Calculation
+-   These subgroups of participants should behave according to the predictions.
 
-```{r UNGwholeBias}
-##  Whole - Ung Bias
+-   What are the predictions?
+  
+    -   RT-wise: Faster RTs in ungrammatical conditions.
+    -   Response-wise: Ungrammaticality Effects, that is a substantial difference between grammatical-sg attractor and grammatical-pl attractor conditions.
 
-hitRates_ung_whole <-
-  data_ungrammaticalityBias_nonna %>% 
-  group_by(subject) %>% 
-  filter(grammatical == "gram") %>% 
-  summarize(
-    hitRate =  mean(ResponseCorrect),
-  ) 
 
-falseAlarms_ung_whole <-
-  data_ungrammaticalityBias_nonna %>% 
-  group_by(subject) %>% 
-  filter(grammatical == "ungram") %>% 
-  summarize(
-    falseAlarm =  mean(response_yes),
+  
+  
+  
+  
+# Descriptive Stats
+  
+
+## Mean Acceptable Responses
+
+```{r labelParticipants accordingly}
+# For ungrammatical bias
+# using fillers
+## lets use 
+biases %<>% within(., {
+  Bias <- ifelse(bias < 0, "towardsG", 
+                 "towardsUng"
   )
+})
 
-zscores_ung_whole <- 
-  full_join(hitRates_ung_whole, 
-            falseAlarms_ung_whole, by = "subject")
-
-zscores_ung_whole <- zscores_ung_whole %>% 
-  mutate(
-    zscore_hitRates = (hitRate - mean(hitRate))/sd(hitRate),
-    zscore_falseAlarms = (falseAlarm - mean(falseAlarm))/sd(falseAlarm)
-  )
-
-biases_ung_whole <- zscores_ung_whole %>% 
-  mutate(
-    bias = -1 * ((zscore_hitRates + zscore_falseAlarms)/2)
-  )
-
-```
-
-```{r plot4}
-biases_ung_whole %>% ggplot(aes(bias, subject)) + 
-  geom_point()+
-  xlab("c (bias) value") +
-  ylab("Subject ID") + 
-  ggtitle("By Participant Bias Values\n using All items for Ungrammatical Bias Exp") +
-  theme_bw()
-
-```
+bias_df <- biases %>% select(subject, Bias)
 
 
-```{r GwholeBias}
-hitRates_g_whole <-
-  data_grammaticalityBias_nonna %>% 
-  group_by(subject) %>% 
-  filter(grammatical == "gram") %>% 
-  summarize(
-    hitRate =  mean(ResponseCorrect),
-  ) 
-
-falseAlarms_g_whole <-
-  data_grammaticalityBias_nonna %>% 
-  group_by(subject) %>% 
-  filter(grammatical == "ungram") %>% 
-  summarize(
-    falseAlarm =  mean(response_yes),
-  ) 
-
-zscores_g_whole <- 
-  full_join(hitRates_g_whole, 
-            falseAlarms_g_whole, by = "subject")
-
-zscores_g_whole <- zscores_g_whole %>% 
-  mutate(
-    zscore_hitRates = (hitRate - mean(hitRate))/sd(hitRate),
-    zscore_falseAlarms = (falseAlarm - mean(falseAlarm))/sd(falseAlarm)
-  )
-
-biases_g_whole <- zscores_g_whole %>% 
-  mutate(
-    bias = -1 * ((zscore_hitRates + zscore_falseAlarms)/2)
-  )
-
-
-```
-
-
-```{r plot5}
-biases_g_whole %>% ggplot(aes(bias, subject)) + 
-  geom_point() + geom_line()+
-  xlab("c (bias) value") +
-  ylab("Subject ID") + 
-  ggtitle("By Participant Bias Values\n using All items for Grammatical Bias Exp") +
-  theme_bw()
-
-```
+df_all  %<>% 
+  full_join(., 
+            bias_df, 
+            by = "subject")
 
 
 
-```{r wideWholeBias}
-ungBias_whole_ExpBias <- 
-  biases_ung_whole %>%  
-  summarize(p_bias = mean(bias), 
-            N = length(subject),
-            CI = 1.96*(sd(bias)/sqrt(length(bias)))) 
+towardsG <- df_all %>% filter(Bias == "towardsG")
+avg_clean <- list()
+avg_clean$resp <- towardsG %>% 
+  plyr::ddply(c("experiment"), function(df) {
+    df %>% se_cousineau(n_conditions = 4, subject, DV = response_yes, 
+                        group = c("experiment", "grammatical", "attractor_num"), 
+                        is_proportion = TRUE)
+  })
 
-ungBias_whole_ExpBias$exp <- "ungBias"
+avg_clean$rt_correct <- towardsG %>% subset(ResponseCorrect) %>%
+  plyr::ddply(c("experiment"), function(df) {
+    df %>% se_cousineau(n_conditions = 4, subject, DV = RT, 
+                        group = c("experiment", "grammatical", "attractor_num"), 
+                        is_proportion = FALSE)
+  })
 
-gBias_whole_ExpBias <- 
-  biases_g_whole %>%  
-  summarize(p_bias = mean(bias), 
-            N = length(subject),
-            CI = 1.96*(sd(bias)/sqrt(length(bias)))) 
+avg_exp <- avg_clean %>% 
+  lapply(function(df) { df %>% subset(is.na(source) | experiment != "filler") })
+avg_exp$resp$bias <- "Bias Towards Grammatical"
+avg_exp$rt_correct$bias <- "Bias Towards Grammatical"
+pd <- position_dodge(0.0)
+p_avg_resp <- avg_exp$resp %>%
+  ggplot(aes(grammatical, M, #linetype = attractor_num, 
+             color = attractor_num, group = attractor_num)) + 
+  geom_point(position = pd) + geom_line(position = pd)
 
-gBias_whole_ExpBias$exp <- "gBias"
+p_avg_resp <- p_avg_resp + geom_errorbar(aes(ymin = M - 1.96*SE, ymax = M + 1.96*SE), width = 0.1, position = pd)
 
-whole_biases <-
-  rbind(gBias_whole_ExpBias, ungBias_whole_ExpBias)
+# p_avg_resp <- p_avg_resp + geom_line(data = avg_fillers) + 
+#                             geom_point(data = avg_fillers) + 
 
+p_avg_resp <- p_avg_resp + theme( strip.background = element_rect(fill="white") ) +
+  theme_bw() + xlab("") + ylab("Percentage 'acceptable'")
+p_avg_resp <- p_avg_resp + scale_y_continuous(labels=scales::percent)#, breaks = c(0, .25, .5, .75, 1))
+p_avg_resp <- p_avg_resp + theme_bw()
+p_avg_resp_towardsG <- p_avg_resp + scale_color_discrete(name = "Attractor Number", labels = c("Plural", "Singular")) + 
+  scale_x_discrete(labels = c("Grammatical\nSingular Verb", "Ungrammatical\nPlural Verb")) + 
+  theme(text = element_text(size = 20))
+
+
+############
+
+towardsUng <- df_all %>% filter(Bias == "towardsUng")
+avg_clean2 <- list()
+avg_clean2$resp <- towardsUng %>% 
+  plyr::ddply(c("experiment"), function(df) {
+    df %>% se_cousineau(n_conditions = 4, subject, DV = response_yes, 
+                        group = c("experiment", "grammatical", "attractor_num"), 
+                        is_proportion = TRUE)
+  })
+
+avg_clean2$rt_correct <- towardsUng %>% subset(ResponseCorrect) %>%
+  plyr::ddply(c("experiment"), function(df) {
+    df %>% se_cousineau(n_conditions = 4, subject, DV = RT, 
+                        group = c("experiment", "grammatical", "attractor_num"), 
+                        is_proportion = FALSE)
+  })
+
+avg_exp2 <- avg_clean2 %>% 
+  lapply(function(df) { df %>% subset(is.na(source) | experiment != "filler") })
+avg_exp2$resp$bias <- "Bias Towards Ungrammatical"
+avg_exp2$rt_correct$bias <- "Bias Towards Ungrammatical"
+pd <- position_dodge(0.0)
+p_avg_resp2 <- avg_exp2$resp %>%
+  ggplot(aes(grammatical, M, #linetype = attractor_num, 
+             color = attractor_num, group = attractor_num)) + 
+  geom_point(position = pd) + geom_line(position = pd)
+
+p_avg_resp2 <- p_avg_resp2 + geom_errorbar(aes(ymin = M - 1.96*SE, ymax = M + 1.96*SE), width = 0.1, position = pd)
+
+# p_avg_resp <- p_avg_resp + geom_line(data = avg_fillers) + 
+#                             geom_point(data = avg_fillers) + 
+
+p_avg_resp2 <- p_avg_resp2 + theme( strip.background = element_rect(fill="white") ) +
+  theme_bw() + xlab("") + ylab("Percentage 'acceptable'")
+p_avg_resp2 <- p_avg_resp2 + scale_y_continuous(labels=scales::percent)#, breaks = c(0, .25, .5, .75, 1))
+p_avg_resp2 <- p_avg_resp2 + theme_bw()
+p_avg_resp_towardsUng <- p_avg_resp2 + scale_color_discrete(name = "Attractor Number", labels = c("Plural", "Singular")) + 
+  scale_x_discrete(labels = c("Grammatical\nSingular Verb", "Ungrammatical\nPlural Verb")) + 
+  theme(text = element_text(size = 20))
 
 
 ```
 
+```{r plotsResp, fig.width=15}
+
+p_avg_resp_towardsUng +theme(legend.position="none") + facet_wrap(~bias) | p_avg_resp_towardsG + ylab("") + theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) + facet_wrap(~bias)
+```
 
 
-```{r plot7}
 
-whole_biases %>% 
-  ggplot(aes(exp, p_bias)) + 
-  geom_point() + 
-  geom_errorbar(aes(ymin = p_bias-CI, 
-                    ymax = p_bias+CI)) +
-  xlab("") +
-  scale_x_discrete(
-    labels = c("Grammatical Bias",
-               "Ungrammatical Bias")
-  ) +
-  ylab("Mean c Value") + 
-  ggtitle("Mean Bias and 95% CIs\n using all items") +
-  theme_bw()
+## Mean Reading Times of Correct Responses
 
+```{r preparePlotRT}
+
+
+pd <- position_dodge(0.0)
+p_rt <- avg_exp$rt_correct %>%
+  ggplot(aes(grammatical, M, #linetype = attractor_num, 
+             color = attractor_num, group = attractor_num)) + 
+  geom_point(position = pd) + geom_line(position = pd)
+
+p_rt <- p_rt + geom_errorbar(aes(ymin = M - 1.96*SE, ymax = M + 1.96*SE), width = 0.1, position = pd)
+
+# p_avg_resp <- p_avg_resp + geom_line(data = avg_fillers) + 
+#                             geom_point(data = avg_fillers) + 
+
+p_rt <- p_rt + theme( strip.background = element_rect(fill="white") ) +
+  theme_bw() + xlab("") + ylab("Mean RT (ms)")
+p_rt <- p_rt + theme_bw() + scale_y_continuous( limits = c(700,1200), expand = c(0,0) )
+p_rt_towardsG <- p_rt + scale_color_discrete(name = "Attractor Number", labels = c("Plural", "Singular")) + 
+  scale_x_discrete(labels = c("Grammatical\nSingular Verb", "Ungrammatical\nPlural Verb")) + 
+  theme(text = element_text(size = 20))
+
+
+p_rt2 <- avg_exp2$rt_correct %>%
+  ggplot(aes(grammatical, M, #linetype = attractor_num, 
+             color = attractor_num, group = attractor_num)) + 
+  geom_point(position = pd) + geom_line(position = pd)
+
+p_rt2 <- p_rt2 + geom_errorbar(aes(ymin = M - 1.96*SE, ymax = M + 1.96*SE), width = 0.1, position = pd)
+
+# p_avg_resp <- p_avg_resp + geom_line(data = avg_fillers) + 
+#                             geom_point(data = avg_fillers) + 
+
+p_rt2 <- p_rt2 + theme( strip.background = element_rect(fill="white") ) +
+  theme_bw() + xlab("") + ylab("Mean RT (ms)")
+p_rt2 <- p_rt2 + theme_bw() +  scale_y_continuous( limits = c(700,1200), expand = c(0,0) )
+p_rt_towardsUng <- p_rt2 + scale_color_discrete(name = "Attractor Number", labels = c("Plural", "Singular")) + 
+  scale_x_discrete(labels = c("Grammatical\nSingular Verb", "Ungrammatical\nPlural Verb")) + 
+  theme(text = element_text(size = 20))
+
+```
+
+
+```{r plotsRT, fig.width=15}
+
+p_rt_towardsUng +theme(legend.position="none") + facet_wrap(~bias) | p_rt_towardsG + ylab("") + theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) + facet_wrap(~bias)
+```
+
+# Session Info
+
+```{r session-info, include=TRUE, echo=TRUE, results='markup'}
+devtools::session_info(pkgs = NULL, include_base = FALSE)
 ```
