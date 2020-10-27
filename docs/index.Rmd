@@ -147,7 +147,7 @@ biases <-
   mutate(
     bias = -1 * ( ( zscore_hitRates + zscore_falseAlarms ) / 2 )
   )
-
+cutpoint <- median(biases$bias)
 ```
 
 ## By Participant Bias 
@@ -167,11 +167,11 @@ biases %>% ggplot(aes(bias, subject)) +
 -   Previous results showed that this manipulation did not was not successful and as can be seen from this graph, they are mostly centered around 0. 
 -   Seems like on average participants were mostly unbiased.
 
-\noindent **Question:** Even though I failed to introduce any bias, Participants that are grouped according to their bias value should reflect the predictions nevertheless.
+__Question:__ Even though I failed to introduce any bias, Participants that are grouped according to their bias value should reflect the predictions nevertheless.
 
 -   So, I cut the participants into two groups.
--   Participants (N= `r sum(biases$bias > 0)`) who had above-zero value of c are biased towards ungrammatical answers.
--   Participants (N= `r sum(biases$bias < 0)`) who had below-zero value of c are biased towards grammatical answers.
+-   Participants (N= `r sum(biases$bias > cutpoint)`) who had above-median value of c  (`r round(cutpoint,2)`) are biased towards ungrammatical answers.
+-   Participants (N= `r sum(biases$bias < cutpoint)`) who had below-median value of c (`r round(cutpoint,2)`) are biased towards grammatical answers.
 
 
   
@@ -207,7 +207,7 @@ biases %>% ggplot(aes(bias, subject)) +
 # using fillers
 ## lets use 
 biases %<>% within(., {
-  Bias <- ifelse(bias < 0, "towardsG", 
+  Bias <- ifelse(bias < cutpoint, "towardsG", 
                  "towardsUng"
   )
 })
