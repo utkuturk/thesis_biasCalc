@@ -188,7 +188,7 @@ biases %>% ggplot(aes(bias, subject)) +
 __Question:__ Even though I failed to introduce any bias, Participants that are grouped according to their bias value should reflect the predictions nevertheless.
 
 -   So, I cut the participants into two groups.
--   Participants (N= `r sum(biases$bias > cutpoint)`) who had above-median value of c  (`r round(cutpoint,2)`) are biased towards ungrammatical answers.
+-   Participants (N= `r sum(biases$bias >= cutpoint)`) who had above and average median value of c  (`r round(cutpoint,2)`) are biased towards ungrammatical answers.
 -   Participants (N= `r sum(biases$bias < cutpoint)`) who had below-median value of c (`r round(cutpoint,2)`) are biased towards grammatical answers.
 
 
@@ -225,8 +225,8 @@ __Question:__ Even though I failed to introduce any bias, Participants that are 
 # using fillers
 ## lets use 
 biases %<>% within(., {
-  Bias <- ifelse(bias < cutpoint, "towardsG", 
-                 "towardsUng"
+  Bias <- ifelse(bias >= cutpoint, "towardsUng", 
+                 "towardsG"
   )
 })
 
