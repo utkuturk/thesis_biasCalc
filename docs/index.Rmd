@@ -90,8 +90,26 @@ df <- full_join(data_grammaticalityBias_nonna_fillers, data_ungrammaticalityBias
 
 ```
 
+# Answers to Question on OneNote
 
-  
+-   **Presence of Agreement Attraction in Both Groups?** 
+
+    -   I will talk about groups **not** in the sense that participants from Exp 1 and Exp 2, but in the sense that participants who are biased towards grammatical or ungrammatical answers.
+    -   Agreement Attractions (difference between plural and singular attractor conditions in ungrammatical sentences) exists for both groups.
+    -   Though, the magnitutde differens. Ungrammatical Bias < Grammatical Bias.
+
+-   **What is the bias situation?**
+
+    -   Bias manipulation failed real hard. No effect of the instruction at all.
+    -   The means and the CIs of the experiments are basically identical (Graph omitted here, will add in the next iteration).
+    
+-   **What happens when we compute bias independent of our manipulation?**
+
+    -   We replicate the aggreement attraction effects in acceptability answers.
+    -   RTs not completely. RTs of people who are biased towards Grammaticality resembles to "No Bias" situation more.
+    -   **Note:** For "No Bias" situation, I just used all of the participants, which has a median of 0.6 for c value. CIs and the mean of the whole dataset is *basically* "No Bias" situation Hammerly et al. 
+    -   The better way would be using our previous experiment where we do not introduce any bias. But theoretically this should hold as well. But it does not.
+
 # Formula Used
   
 $c = - \frac{Z(Hit\ Rate)\ +\ Z(False\ Alarm\ Rate)}{2}$
@@ -304,13 +322,53 @@ p_avg_resp_towardsUng <- p_avg_resp2 + scale_color_discrete(name = "Attractor Nu
   theme(text = element_text(size = 20))
 
 
+######
+
+avg_clean3 <- list()
+avg_clean3$resp <- df_all %>% 
+  plyr::ddply(c("experiment"), function(df) {
+    df %>% se_cousineau(n_conditions = 4, subject, DV = response_yes, 
+                        group = c("experiment", "grammatical", "attractor_num"), 
+                        is_proportion = TRUE)
+  })
+
+avg_clean3$rt_correct <- df_all %>% subset(ResponseCorrect) %>%
+  plyr::ddply(c("experiment"), function(df) {
+    df %>% se_cousineau(n_conditions = 4, subject, DV = RT, 
+                        group = c("experiment", "grammatical", "attractor_num"), 
+                        is_proportion = FALSE)
+  })
+
+avg_exp3 <- avg_clean3 %>% 
+  lapply(function(df) { df %>% subset(is.na(source) | experiment != "filler") })
+
+p_avg_resp3 <- avg_exp3$resp %>%
+  ggplot(aes(grammatical, M, #linetype = attractor_num, 
+             color = attractor_num, group = attractor_num)) + 
+  geom_point(position = pd) + geom_line(position = pd)
+
+p_avg_resp3 <- p_avg_resp3 + geom_errorbar(aes(ymin = M - 1.96*SE, ymax = M + 1.96*SE), width = 0.1, position = pd)
+
+# p_avg_resp <- p_avg_resp + geom_line(data = avg_fillers) + 
+#                             geom_point(data = avg_fillers) + 
+
+p_avg_resp3 <- p_avg_resp3 + theme( strip.background = element_rect(fill="white") ) +
+  theme_bw() + xlab("") + ylab("Percentage 'acceptable'")
+p_avg_resp3 <- p_avg_resp3 + scale_y_continuous(labels=scales::percent)#, breaks = c(0, .25, .5, .75, 1))
+p_avg_resp3 <- p_avg_resp3 + theme_bw()
+p_avg_resp_nobias <- p_avg_resp3 + scale_color_discrete(name = "Attractor Number", labels = c("Plural", "Singular")) + 
+  scale_x_discrete(labels = c("Grammatical\nSingular Verb", "Ungrammatical\nPlural Verb")) + 
+  theme(text = element_text(size = 20)) + facet_wrap(~experiment, labeller = labeller(experiment = c("AgrAttr" = "No Bias (Groups Together)")))
+
 ```
 
 ```{r plotsResp, fig.width=15}
 
-p_avg_resp_towardsUng +theme(legend.position="none") + facet_wrap(~bias) | p_avg_resp_towardsG + ylab("") + theme(axis.title.y=element_blank(),
+p_avg_resp_towardsUng +theme(legend.position="none") + facet_wrap(~bias) | p_avg_resp_towardsG +theme(legend.position="none") + ylab("") + theme(axis.title.y=element_blank(),
         axis.text.y=element_blank(),
-        axis.ticks.y=element_blank()) + facet_wrap(~bias)
+        axis.ticks.y=element_blank()) + facet_wrap(~bias) | p_avg_resp_nobias + ylab("") + theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) 
 ```
 
 
@@ -356,6 +414,24 @@ p_rt_towardsUng <- p_rt2 + scale_color_discrete(name = "Attractor Number", label
   scale_x_discrete(labels = c("Grammatical\nSingular Verb", "Ungrammatical\nPlural Verb")) + 
   theme(text = element_text(size = 20))
 
+
+p_rt3 <- avg_exp3$rt_correct %>%
+  ggplot(aes(grammatical, M, #linetype = attractor_num, 
+             color = attractor_num, group = attractor_num)) + 
+  geom_point(position = pd) + geom_line(position = pd)
+
+p_rt3 <- p_rt3 + geom_errorbar(aes(ymin = M - 1.96*SE, ymax = M + 1.96*SE), width = 0.1, position = pd)
+
+# p_avg_resp <- p_avg_resp + geom_line(data = avg_fillers) + 
+#                             geom_point(data = avg_fillers) + 
+
+p_rt3 <- p_rt3 + theme( strip.background = element_rect(fill="white") ) +
+  theme_bw() + xlab("") + ylab("Mean RT (ms)")
+p_rt3 <- p_rt3 + theme_bw() + scale_y_continuous( limits = c(700,1200), expand = c(0,0) )
+p_rt_nobias <- p_rt3 + scale_color_discrete(name = "Attractor Number", labels = c("Plural", "Singular")) + 
+  scale_x_discrete(labels = c("Grammatical\nSingular Verb", "Ungrammatical\nPlural Verb")) + 
+  theme(text = element_text(size = 20)) + facet_wrap(~experiment, labeller = labeller(experiment = c("AgrAttr" = "No Bias (Groups Together)")))
+
 ```
 
 
@@ -363,7 +439,9 @@ p_rt_towardsUng <- p_rt2 + scale_color_discrete(name = "Attractor Number", label
 
 p_rt_towardsUng +theme(legend.position="none") + facet_wrap(~bias) | p_rt_towardsG + ylab("") + theme(axis.title.y=element_blank(),
         axis.text.y=element_blank(),
-        axis.ticks.y=element_blank()) + facet_wrap(~bias)
+        axis.ticks.y=element_blank()) + theme(legend.position="none") + facet_wrap(~bias) | p_rt_nobias + ylab("") + theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
 ```
 
 # Session Info
